@@ -1,0 +1,23 @@
+name: jis0208
+description: Japanese charset converter library for Dart.
+version: 1.0.0
+repository: https://github.com/kkazuo/jis0208.git
+license: BSD3
+topics:
+  - charset
+  - converter
+  - encode
+  - decode
+  - windows
+
+environment:
+  sdk: ^3.3.1
+
+# Add regular dependencies here.
+dependencies:
+  {}
+  # path: ^1.8.0
+
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0
