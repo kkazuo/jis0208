@@ -1,3 +1,5 @@
+## 1.0.1
+
 - Add buffering to converters.
 - Fix: EucJpEncoder invalid pointer range check.
 

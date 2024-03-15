@@ -1,6 +1,6 @@
 name: jis0208
 description: Japanese charset converter library for Dart.
-version: 1.0.0
+version: 1.0.1
 repository: https://github.com/kkazuo/jis0208.git
 license: BSD3
 topics:
