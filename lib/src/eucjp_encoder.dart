@@ -78,7 +78,7 @@ class _StringConversionSink extends StringConversionSinkMixin {
       }
 
       final pointer = toJIS[codepoint];
-      if (pointer == null || pointer > 8836) {
+      if (pointer == null || pointer >= 8836) {
         // replacement to '?'
         _buffer.add(0x3F);
         continue;
