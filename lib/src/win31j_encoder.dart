@@ -29,27 +29,47 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:jis0208/src/jis0208_table.dart';
+import 'package:jis0208/src/buffers.dart';
 
 /// Windows-31J charset encoder
 class Windows31JEncoder extends Converter<String, Uint8List> {
   @override
   Uint8List convert(String input) {
-    final bytes = BytesBuilder();
+    final buffer = BytesBuilder(copy: false);
+    startChunkedConversion(BytesSink(buffer))
+      ..add(input)
+      ..close();
+    return buffer.toBytes();
+  }
+
+  @override
+  Sink<String> startChunkedConversion(Sink<Uint8List> sink) =>
+      _StringConversionSink(sink);
+}
+
+class _StringConversionSink extends StringConversionSinkMixin {
+  final Sink<Uint8List> _sink;
+  final ByteBuffer _buffer;
+
+  _StringConversionSink(this._sink) : _buffer = ByteBuffer(_sink);
+
+  @override
+  void add(String input) {
     for (var codepoint in input.runes) {
       if (0 <= codepoint && codepoint <= 0x80) {
-        bytes.addByte(codepoint);
+        _buffer.add(codepoint);
         continue;
       }
       if (codepoint == 0xA5) {
-        bytes.addByte(0x5C);
+        _buffer.add(0x5C);
         continue;
       }
       if (codepoint == 0x203E) {
-        bytes.addByte(0x7E);
+        _buffer.add(0x7E);
         continue;
       }
       if (0xFF61 <= codepoint && codepoint <= 0xFF9F) {
-        bytes.addByte(codepoint - 0xFF61 + 0xA1);
+        _buffer.add(codepoint - 0xFF61 + 0xA1);
         continue;
       }
       if (codepoint == 0x2212) {
@@ -59,41 +79,29 @@ class Windows31JEncoder extends Converter<String, Uint8List> {
       final pointer = toJIS[codepoint];
       if (pointer == null) {
         // replacement to '?'
-        bytes.addByte(0x3F);
+        _buffer.add(0x3F);
         continue;
       }
 
       final lead = pointer ~/ 188;
       final trail = pointer % 188;
 
-      bytes.addByte(lead + (lead < 0x1F ? 0x81 : 0xC1));
-      bytes.addByte(trail + (trail < 0x3F ? 0x40 : 0x41));
+      _buffer.add(lead + (lead < 0x1F ? 0x81 : 0xC1));
+      _buffer.add(trail + (trail < 0x3F ? 0x40 : 0x41));
     }
-    return bytes.toBytes();
   }
 
   @override
-  Sink<String> startChunkedConversion(Sink<Uint8List> sink) =>
-      _StringConversionSink(sink, this);
-}
-
-class _StringConversionSink extends StringConversionSinkMixin {
-  final Sink<Uint8List> _sink;
-  final Converter<String, Uint8List> _converter;
-
-  _StringConversionSink(this._sink, this._converter);
-
-  @override
-  void add(String str) => _sink.add(_converter.convert(str));
-
-  @override
   void addSlice(String str, int start, int end, bool isLast) {
-    _sink.add(_converter.convert(str.substring(start, end)));
+    add(str.substring(start, end));
     if (isLast) {
       close();
     }
   }
 
   @override
-  void close() => _sink.close();
+  void close() {
+    _buffer.close();
+    _sink.close();
+  }
 }

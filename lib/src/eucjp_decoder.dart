@@ -29,6 +29,7 @@ import 'dart:convert';
 
 import 'package:jis0208/src/jis0208_table.dart';
 import 'package:jis0208/src/jis0212_table.dart' as jis0212;
+import 'package:jis0208/src/buffers.dart';
 
 /// EUC-JP charset decoder
 class EucJpDecoder extends Converter<List<int>, String> {
@@ -47,11 +48,11 @@ class EucJpDecoder extends Converter<List<int>, String> {
 
   @override
   String convert(List<int> input) {
-    final buffer = StringBuffer();
-    startChunkedConversion(_StringSink(buffer))
+    final sink = StringSink();
+    startChunkedConversion(sink)
       ..add(input)
       ..close();
-    return buffer.toString();
+    return sink.inner();
   }
 
   @override
@@ -59,28 +60,16 @@ class EucJpDecoder extends Converter<List<int>, String> {
       _ByteConversionSink(sink, _allowMalformed);
 }
 
-class _StringSink implements Sink<String> {
-  final StringBuffer _buffer;
-
-  _StringSink(this._buffer);
-
-  @override
-  void add(String data) {
-    _buffer.write(data);
-  }
-
-  @override
-  void close() {}
-}
-
 class _ByteConversionSink extends ByteConversionSinkBase {
   final bool _allowMalformed;
   final Sink<String> _sink;
+  final CharCodeBuffer _buffer;
   int _lead;
   bool _jis0212;
 
   _ByteConversionSink(this._sink, this._allowMalformed)
-      : _lead = 0,
+      : _buffer = CharCodeBuffer(_sink),
+        _lead = 0,
         _jis0212 = false;
 
   @override
@@ -88,7 +77,7 @@ class _ByteConversionSink extends ByteConversionSinkBase {
     for (final byte in chunk) {
       if (_lead == 0x8E && 0xA1 <= byte && byte <= 0xDF) {
         _lead = 0;
-        _sink.add(String.fromCharCode(0xFF61 - 0xA1 + byte));
+        _buffer.add(0xFF61 - 0xA1 + byte);
         continue;
       }
       if (_lead == 0x8F && 0xA1 <= byte && byte <= 0xFE) {
@@ -112,26 +101,26 @@ class _ByteConversionSink extends ByteConversionSinkBase {
         _jis0212 = false;
 
         if (codepoint != null) {
-          _sink.add(String.fromCharCode(codepoint));
+          _buffer.add(codepoint);
           continue;
         }
 
         if (0 <= byte && byte <= 0x7F) {
-          _sink.add(String.fromCharCode(byte));
+          _buffer.add(byte);
         } else if (_allowMalformed) {
-          _sink.add(String.fromCharCode(0xFFFD));
+          _buffer.add(0xFFFD);
         } else {
           throw FormatException('Malformed input of byte as $byte.');
         }
       } else {
         if (0 <= byte && byte <= 0x7F) {
-          _sink.add(String.fromCharCode(byte));
+          _buffer.add(byte);
         } else if (byte == 0x8E ||
             byte == 0x8F ||
             0xA1 <= byte && byte <= 0xFE) {
           _lead = byte;
         } else if (_allowMalformed) {
-          _sink.add(String.fromCharCode(0xFFFD));
+          _buffer.add(0xFFFD);
         } else {
           throw FormatException('Malformed end of input.');
         }
@@ -144,11 +133,12 @@ class _ByteConversionSink extends ByteConversionSinkBase {
     if (_lead != 0) {
       _lead = 0;
       if (_allowMalformed) {
-        _sink.add(String.fromCharCode(0xFFFD));
+        _buffer.add(0xFFFD);
       } else {
         throw FormatException('Malformed end of input.');
       }
     }
+    _buffer.close();
     _sink.close();
   }
 }

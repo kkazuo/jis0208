@@ -58,13 +58,7 @@ Unicodeで結合文字列処理が必要なJIS X 0213非漢字　カ゚
   group('A group of Windows-31J tests', () {
     final decoder = Windows31JDecoder();
     final encoder = Windows31JEncoder();
-
-    setUp(() {
-      // Additional setup goes here.
-    });
-
-    test('Encode/Decode Round Trip Test', () {
-      final expected = '''
+    final expected = '''
 第1水準の漢字　飴愛嬉
 第2水準の漢字　發曖巫
 第3水準の漢字　俉???猪?
@@ -86,20 +80,39 @@ Unicodeでサロゲートペアが必要な第3水準の漢字　?
 Unicodeでサロゲートペアが必要な第4水準の漢字　?
 Unicodeで結合文字列処理が必要なJIS X 0213非漢字　カ?
 ''';
-      expect(decoder.convert(encoder.convert(input)), (a) => a == expected);
-    });
-  });
-
-  group('A group of EUC-JP tests', () {
-    final decoder = EucJpDecoder();
-    final encoder = EucJpEncoder();
 
     setUp(() {
       // Additional setup goes here.
     });
 
     test('Encode/Decode Round Trip Test', () {
-      final expected = '''
+      expect(decoder.convert(encoder.convert(input)), (a) => a == expected);
+    });
+
+    Stream<String> bigString(int count) async* {
+      for (var i = 0; i < count; i += 1) {
+        yield input;
+      }
+    }
+
+    test('Heavy Load Bench', () async {
+      final count = 30000;
+      final len = (await bigString(count)
+              .transform(encoder)
+              .map<List<int>>((event) => event)
+              .transform(decoder)
+              .fold(StringBuffer(),
+                  (previous, element) => previous..write(element)))
+          .toString()
+          .length;
+      expect(len, count * expected.length);
+    });
+  });
+
+  group('A group of EUC-JP tests', () {
+    final decoder = EucJpDecoder();
+    final encoder = EucJpEncoder();
+    final expected = '''
 第1水準の漢字　飴愛嬉
 第2水準の漢字　發曖巫
 第3水準の漢字　??????
@@ -121,7 +134,32 @@ Unicodeでサロゲートペアが必要な第3水準の漢字　?
 Unicodeでサロゲートペアが必要な第4水準の漢字　?
 Unicodeで結合文字列処理が必要なJIS X 0213非漢字　カ?
 ''';
+
+    setUp(() {
+      // Additional setup goes here.
+    });
+
+    test('Encode/Decode Round Trip Test', () {
       expect(decoder.convert(encoder.convert(input)), (a) => a == expected);
+    });
+
+    Stream<String> bigString(int count) async* {
+      for (var i = 0; i < count; i += 1) {
+        yield input;
+      }
+    }
+
+    test('Heavy Load Bench', () async {
+      final count = 30000;
+      final len = (await bigString(count)
+              .transform(encoder)
+              .map<List<int>>((event) => event)
+              .transform(decoder)
+              .fold(StringBuffer(),
+                  (previous, element) => previous..write(element)))
+          .toString()
+          .length;
+      expect(len, count * expected.length);
     });
   });
 }

@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import 'dart:convert';
 
 import 'package:jis0208/src/jis0208_table.dart';
+import 'package:jis0208/src/buffers.dart';
 
 /// Windows-31J charset decoder
 class Windows31JDecoder extends Converter<List<int>, String> {
@@ -46,11 +47,11 @@ class Windows31JDecoder extends Converter<List<int>, String> {
 
   @override
   String convert(List<int> input) {
-    final buffer = StringBuffer();
-    startChunkedConversion(_StringSink(buffer))
+    final sink = StringSink();
+    startChunkedConversion(sink)
       ..add(input)
       ..close();
-    return buffer.toString();
+    return sink.inner();
   }
 
   @override
@@ -58,26 +59,15 @@ class Windows31JDecoder extends Converter<List<int>, String> {
       _ByteConversionSink(sink, _allowMalformed);
 }
 
-class _StringSink implements Sink<String> {
-  final StringBuffer _buffer;
-
-  _StringSink(this._buffer);
-
-  @override
-  void add(String data) {
-    _buffer.write(data);
-  }
-
-  @override
-  void close() {}
-}
-
 class _ByteConversionSink extends ByteConversionSinkBase {
   final bool _allowMalformed;
   final Sink<String> _sink;
+  final CharCodeBuffer _buffer;
   int _lead;
 
-  _ByteConversionSink(this._sink, this._allowMalformed) : _lead = 0;
+  _ByteConversionSink(this._sink, this._allowMalformed)
+      : _buffer = CharCodeBuffer(_sink),
+        _lead = 0;
 
   @override
   void add(List<int> chunk) {
@@ -93,32 +83,32 @@ class _ByteConversionSink extends ByteConversionSinkBase {
           final pointer = (lead - leadOffset) * 188 + byte - offset;
           if (8836 <= pointer && pointer <= 10715) {
             // This is interoperable legacy from Windows known as EUDC.
-            _sink.add(String.fromCharCode(0xE000 - 8836 + pointer));
+            _buffer.add(0xE000 - 8836 + pointer);
             continue;
           }
           final codepoint = toUnicode[pointer];
           if (codepoint != null) {
-            _sink.add(String.fromCharCode(codepoint));
+            _buffer.add(codepoint);
             continue;
           }
         }
         if (0 <= byte && byte <= 0x7F) {
-          _sink.add(String.fromCharCode(byte));
+          _buffer.add(byte);
         } else if (_allowMalformed) {
-          _sink.add(String.fromCharCode(0xFFFD));
+          _buffer.add(0xFFFD);
         } else {
           throw FormatException('Malformed end of input.');
         }
       } else {
         if (0 <= byte && byte <= 0x80) {
-          _sink.add(String.fromCharCode(byte));
+          _buffer.add(byte);
         } else if (0xA1 <= byte && byte <= 0xDF) {
-          _sink.add(String.fromCharCode(0xFF61 - 0xA1 + byte));
+          _buffer.add(0xFF61 - 0xA1 + byte);
         } else if (0x81 <= byte && byte <= 0x9F ||
             0xE0 <= byte && byte <= 0xFC) {
           _lead = byte;
         } else if (_allowMalformed) {
-          _sink.add(String.fromCharCode(0xFFFD));
+          _buffer.add(0xFFFD);
         } else {
           throw FormatException('Malformed end of input.');
         }
@@ -131,11 +121,12 @@ class _ByteConversionSink extends ByteConversionSinkBase {
     if (_lead != 0) {
       _lead = 0;
       if (_allowMalformed) {
-        _sink.add(String.fromCharCode(0xFFFD));
+        _buffer.add(0xFFFD);
       } else {
         throw FormatException('Malformed end of input.');
       }
     }
+    _buffer.close();
     _sink.close();
   }
 }
