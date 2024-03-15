@@ -19,8 +19,8 @@ You can encode/decode string to bytes with Japanese legacy encodings such as EUC
 
 - [x] Windows-31J Encode/Decode. (a.k.a. Shift_JIS)
 - [x] EUC-JP Encode/Decode.
-- [ ] EUC-JP-ms Encode/Decode.
-- [ ] CP51932 Encode/Decode.
+- [ ] EUC-JP-ms Encode/Decode. (not yet)
+- [ ] CP51932 Encode/Decode. (not yet)
 
 ## Getting started
 
